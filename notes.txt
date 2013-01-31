@@ -1,0 +1,9 @@
+Bottle backend server project notes by Matt
+
+This server depends heavily on being run with an https forced server. There are ways to extend
+bottle to require an https connection, but I could just set up gunicorn on Heroku with this:
+
+secure_scheme_headers = {'X-FORWARDED-PROTO' : 'https'}
+
+to force the server to only run on HTTPS. In production, you would want to have a failsafe in
+the server code to make sure you aren't serving DB queries over unencrypted connections.
