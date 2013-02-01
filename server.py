@@ -17,27 +17,84 @@ along with this program.  If not, see http://www.gnu.org/licenses.
  and serve access to an sql database. The users and passwords are intentionally
  hardcoded to restrict access since this is a demonstration.
  
- This script was written against Bottle 0.11 and Python 3.3
+ This server script was written against Python 3.3, Bottle 0.11, and Psycopg2 2.4.6
 """
 
-from bottle import post, request, response
+from bottle import post, request, response, run
 from random import choice
 from time import time
+import psycopg2
+import re
 import string
 
 # DON'T store passwords in plaintext. In a produciton environment these would be
 # stored in an encrypted database or file, preferrably 256 bit blowfish or AES in 
 # case any sql vulnerabilities emerge to inject queries.
-
 users = {
-  'matt' : 'ExplosiveSheep',
-  'guest' : 'AbrahamLincoln',
+  'matt' : 'bdm4Xj8uHjd7654l',
+  'guest' : 'ExtremeMeasures',
 }
 
 # Neat feature of bottle - dict returns from http requests generate json content-types 
-# and implicitly does the dumps. These two dicts are json returns of common errors.
-failedValidate = {'Querystatus' : 'Invalid Credentials'}
-failedJSON = {'Querystatus' : 'Invalid JSON'}
+# and implicitly does the dumps. These dicts are json returns of common errors.
+badValidate = {'status' : 'Invalid Credentials'}
+badJSON = {'status' : 'Invalid JSON'}
+badQuery = {'status' : 'No sql command'}
+badCommand = {'status' : 'Malformed SQL command'}
+
+"""
+ Regex patterns to identify SQL commands passed in. All use re.I to be case insenitive regexes.
+ The following statements aren't included:
+ PREPARE / EXECUTE : break the discretization of statements I have going.
+ REASSIGN OWNED / GRANT / REVOKE : we use one sql user and nobody outside should need to modify one. Note: 
+    I don't forbid other cascade user modification commands that are parts of drop, alter, or add, in practice 
+    you would sanitize this more. I just didn't need to add this one if it has no practical use.
+ BEGIN / COMMIT / ABORT / ROLLBACK / DEALLOCATE / LOCK / RELEASE SAVEPOINT / SAVEPOINT / START TRANSACTION: 
+    These block control statements depend on multiple sql instructions happening in order. Since this server allows 
+    concurrent users, having these statements would allow other inputs to enter a block statement.
+ CHECKPOINT : All statements are immediately commited after use, and logging is inacccessable by users.
+ DECLARE / CLOSE / FETCH / MOVE : The database itself is managing the cursor, and clients shouldn't know it's name.
+ COPY : all sql statements are over json without files attached.
+ DO : why are you trying to execute arbitrary code?
+ LISTEN / NOTIFY / UNLISTEN : These commands create callbacks that would break result fetches if they are caused by
+    another users listeners in someones query. In a more advanced implementation, you would want to have open 
+    connections to clients and allow for event signals like this.
+ LOAD : there is undefined behavior in trying to load arbitrary libraries on a heroku dyno.
+ SECURITY LABEL : Requires backend handlers of security transactions. Way beyond the scope of this project, and very
+    context specific (a use case is for selinux).
+"""
+queries = (re.compile("$ANALYZE", re.I), 
+  re.compile("$EXPLAIN", re.I),
+# I mentioned cascade statements from multiple users can intermingle. This is one of those cases - if two people are
+# submitting queries simultaneously, an out of order select can screw things up. To fix it, you would want to force
+# users to create block statements with begin etc and buffer statements until a complete block can be submitted to the
+# backend. However, selecting is kind of important.
+  re.compile("$SELECT", re.I),
+  re.compile("$SHOW", re.I),
+  re.compile("$VALUES", re.I),
+)
+mods = (re.compile("$ALTER", re.I), 
+  re.compile("$CLUSTER", re.I),
+  re.compile("$REINDEX", re.I),
+  re.compile("$RESET", re.I),
+  re.compile("$SET", re.I),
+  re.compile("$UPDATE", re.I),
+  re.compile("$VACUUM", re.I),
+)
+adds = (re.compile("$CREATE", re.I), 
+  re.compile("$INSERT", re.I), 
+)
+# These are the destructive commands that can screw up a database.
+dangers = (re.compile("$DELETE", re.I), 
+  re.compile("$DROP", re.I), 
+  re.compile("$TRUNCATE", re.I),
+)
+
+# It would be reasonable in a production environment to replace all those re.compile({}, re.I) statements with a
+# delegate like:
+# def compWrap(regex):
+#    return re.compile(regex, re.I)
+# Depending on if it is used a lot. Here it is just clearer to use the standard library regex syntax repeatedly.
 
 secretkey = 'itsasecrettoeverybody-'.join(choice(string.ascii_letters + string.digits) for i in range(32))
 
@@ -46,52 +103,88 @@ def validUser(usr, pwd):
     return True
   return False
 
-# Composition, not polymorphism!
-def badRequest(request):
+# Composition, not polymorphism! These are all the input santiziation measures on a user input.
+# validCmds is the set of sql statements authorized to be run.
+def verifyRequest(request, validCmds):
   if request.get_cookie('session', secret=secretkey) not in users:
-    return (True, failedValidate)
+    return (True, badValidate)
   query = request.json
   if query == None:
-    return (True, failedJSON)
-# All these tuples are in case we do get a valid query, we can return it and not need to do a (potentially)
-# expensive reparse of json data.
-  return (False, query)
-  
+    return (True, badJSON)
+# The posted JSON must have the statement as the key : value of cmd : statement.
+  cmd = query['cmd']
+  if cmd == None:
+    return (True, badQuery)
+  for regex in validCmds:
+    if regex.match(cmd):
+# This partition makes sure we only ever execute one sql statement at a time. Otherwise any
+# santization of the first statement is pointless because you could just ; DROP TABLE.
+      return (False, cmd.partition(';')[0])
+  return (True, badCommand)
+
+# Extracted the behavior of queries that modify the db.
+def runmod(request, validCmds):
+  status = verifyRequest(request, queries)
+  if status[0] != False:
+    return status[1]
+  try:
+# The global namespace cursor is provided with statements at the end of this script.
+    cursor.execute(status[1])
+  except psycopg2.Warning as msg:
+# Also declared in with statements is the database.
+    db.rollback()
+    return {'warning' : str(msg)}
+  except psycopg2.Error as msg:
+    db.rollback()
+    return {'error', msg.pgerror}
+  db.commit()
+  return {'result' : cursor.fetchmany()}
+
 @post('/')
 @post('/login')
 def login():
   query = request.json
   if query == None:
-    return failedJSON
+    return badJSON
   usr = query['usr']
 # In production, you would want clients to encrypt the password with a publickey before sending it.
   pwd = query['pwd']
   if not validUser(usr, pwd):
-    return failedValidate
+    return badValidate
 # In practice, you would want expiring cookies, and two cookies per user - a session cookie
 # to verify the user identity, and a user specific key cookie to guarantee no one is trying
 # to impersonate someone else logged in who knows the secretkey. Bottle supports cookie expiration.
   response.set_cookie('session', usr, secret=secretkey)
-  return {'Querystatus' : 'Login success at ' + str(time()) + 'UNIX time')}
+  return {'status' : 'Login success at ' + str(time()) + 'UNIX time'}
 
-@post('/query')
-def query():
-  status = badRequest(request)
-  if status[0] not False:
-    return status
-  query = status[1]
-
+# These three all have similar behaviour, since they have side effects, they just have different 
+# valid command lists.
 @post('/modify')
 def modify():
-  status = badRequest(request)
-  if status[0] not False:
-    return status
-  query = status[1]
+  return runmod(request, mods)
   
 @post('/add')
 def add():
-  status = badRequest(request)
-  if status[0] not False:
+  return runmod(request, adds)
+
+@post('/remove')
+def remove():
+  return runmod(request, dangers)
+
+# This is the exception, where queries don't have side effects.
+@post('/query')
+def query():
+  status = verifyRequest(request, queries)
+  if status[0] != False:
     return status
-  query = status[1]
-  
+  try:
+    cursor.execute(status[1])
+  except psycopg2.Warning as msg:
+    return {'warning' : str(msg)}
+  except psycopg2.Error as msg:
+    return {'error', msg.pgerror}
+  return {'result' : cursor.fetchmany()}
+
+with psycopg2.connect("dbname=bottlesql user=topmen password=bdm4Xj8uHjd7654l") as db:
+  with db.cursor() as cursor:
+    run(host='localhost', port=8080)
