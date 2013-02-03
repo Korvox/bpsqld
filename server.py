@@ -17,7 +17,7 @@ along with this program.  If not, see http://www.gnu.org/licenses.
  and serve access to an sql database. The users and passwords are intentionally
  hardcoded to restrict access since this is a demonstration.
  
- This server script was written against Python 3.3, Bottle 0.11, and Psycopg2 2.4.6
+ See requirements.txt and runtime.txt for the various dependencies this was written against.
 """
 
 from bottle import post, request, response, run
@@ -31,8 +31,8 @@ import string
 import atexit
 
 # DON'T store passwords in plaintext. In a produciton environment these would be
-# stored in an encrypted database or file, preferrably 256 bit blowfish or AES in 
-# case any sql vulnerabilities emerge to inject queries.
+# stored in an encrypted database or file, preferrably 256 bit AES in case any sql 
+# vulnerabilities emerge to inject queries.
 users = {
   'matt' : 'bdm4Xj8uHjd7654l',
   'guest' : 'ExtremeMeasures',
