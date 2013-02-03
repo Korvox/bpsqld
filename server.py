@@ -23,6 +23,8 @@ along with this program.  If not, see http://www.gnu.org/licenses.
 from bottle import post, request, response, run
 from random import choice
 from time import time
+from multiprocessing import cpu_count
+from os import environ
 import psycopg2
 import re
 import string
@@ -188,7 +190,7 @@ def query():
 
 # Documentation says you can use with X as Y syntax with connect and cursor, but in practice
 # they error out with __exit__ failing. Potential bug to be submitted against psycopg.
-db = psycopg2.connect(database="bottlesrv", user="postgres", password="bdm4Xj8uHjd7654l")
+db = psycopg2.connect(database='bottlesrv', user='postgres', password='bdm4Xj8uHjd7654l')
 cursor = db.cursor()
 
 # I wish lambdas supported multiple statements.
@@ -197,5 +199,9 @@ def closedb():
   cursor.close()
 atexit.register(closedb)
 
-# Multithreaded http server goodness! This is where we use gunicorn.
-run(host='localhost', port=8080, server='gunicorn', workers=8)
+run(server='gunicorn', 
+# These options are all required to set up ssl on a heroku dyno and get correct port handling.
+  host='0.0.0.0', port=int(environ.get('PORT', 9876)), workers=cpu_count(),
+  forwarded_allow_ips='*',
+  secure_scheme_headers={'X-FORWARDED-PROTOCOL': 'ssl', 'X-FORWARDED-PROTO': 'https', 'X-FORWARDED-SSL': 'on'}
+)
