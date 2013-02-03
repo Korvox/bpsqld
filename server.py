@@ -190,7 +190,7 @@ def query():
 
 # Documentation says you can use with X as Y syntax with connect and cursor, but in practice
 # they error out with __exit__ failing. Potential bug to be submitted against psycopg.
-db = psycopg2.connect(database='bottlesrv', user='postgres', password='bdm4Xj8uHjd7654l')
+db = psycopg2.connect(database='datjsbtecref3n', user='fesbqrrveoiunr', password='C_W31yYcSP2qqPdEPUDmjnXZqh')
 cursor = db.cursor()
 
 # I wish lambdas supported multiple statements.
