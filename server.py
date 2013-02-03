@@ -26,6 +26,7 @@ from time import time
 import psycopg2
 import re
 import string
+import atexit
 
 # DON'T store passwords in plaintext. In a produciton environment these would be
 # stored in an encrypted database or file, preferrably 256 bit blowfish or AES in 
@@ -63,31 +64,31 @@ badCommand = {'status' : 'Malformed SQL command'}
  SECURITY LABEL : Requires backend handlers of security transactions. Way beyond the scope of this project, and very
     context specific (a use case is for selinux).
 """
-queries = (re.compile("$ANALYZE", re.I), 
-  re.compile("$EXPLAIN", re.I),
+queries = (re.compile("ANALYZE", re.I), 
+  re.compile("EXPLAIN", re.I),
 # I mentioned cascade statements from multiple users can intermingle. This is one of those cases - if two people are
 # submitting queries simultaneously, an out of order select can screw things up. To fix it, you would want to force
 # users to create block statements with begin etc and buffer statements until a complete block can be submitted to the
 # backend. However, selecting is kind of important.
-  re.compile("$SELECT", re.I),
-  re.compile("$SHOW", re.I),
-  re.compile("$VALUES", re.I),
+  re.compile("SELECT", re.I),
+  re.compile("SHOW", re.I),
+  re.compile("VALUES", re.I),
 )
-mods = (re.compile("$ALTER", re.I), 
-  re.compile("$CLUSTER", re.I),
-  re.compile("$REINDEX", re.I),
-  re.compile("$RESET", re.I),
-  re.compile("$SET", re.I),
-  re.compile("$UPDATE", re.I),
-  re.compile("$VACUUM", re.I),
+mods = (re.compile("ALTER", re.I), 
+  re.compile("CLUSTER", re.I),
+  re.compile("REINDEX", re.I),
+  re.compile("RESET", re.I),
+  re.compile("SET", re.I),
+  re.compile("UPDATE", re.I),
+  re.compile("VACUUM", re.I),
 )
-adds = (re.compile("$CREATE", re.I), 
-  re.compile("$INSERT", re.I), 
+adds = (re.compile("CREATE", re.I), 
+  re.compile("INSERT", re.I), 
 )
 # These are the destructive commands that can screw up a database.
-dangers = (re.compile("$DELETE", re.I), 
-  re.compile("$DROP", re.I), 
-  re.compile("$TRUNCATE", re.I),
+dangers = (re.compile("DELETE", re.I), 
+  re.compile("DROP", re.I), 
+  re.compile("TRUNCATE", re.I),
 )
 
 # It would be reasonable in a production environment to replace all those re.compile({}, re.I) statements with a
@@ -185,6 +186,16 @@ def query():
     return {'error', msg.pgerror}
   return {'result' : cursor.fetchmany()}
 
-with psycopg2.connect("dbname=bottlesql user=topmen password=bdm4Xj8uHjd7654l") as db:
-  with db.cursor() as cursor:
-    run(host='localhost', port=8080)
+# Documentation says you can use with X as Y syntax with connect and cursor, but in practice
+# they error out with __exit__ failing. Potential bug to be submitted against psycopg.
+db = psycopg2.connect(database="bottlesrv", user="postgres", password="bdm4Xj8uHjd7654l")
+cursor = db.cursor()
+
+# I wish lambdas supported multiple statements.
+def closedb():
+  db.close()
+  cursor.close()
+atexit.register(closedb)
+
+# Multithreaded http server goodness! This is where we use gunicorn.
+run(host='localhost', port=8080, server='gunicorn', workers=8)

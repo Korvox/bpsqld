@@ -12,3 +12,9 @@ The way I wrote the server is impractical in a larger implementation. It would m
 production to put the entire thing in a class, instanciate it from within if __name__ == __main__, 
 and keep it all wrapped up nicely. Here, it just makes more sense to use the global namespace in
 such a small project.
+
+Heroku depends (just get latest):
+Python3
+Bottle
+Psycopg2
+Gunicorn
