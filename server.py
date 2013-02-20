@@ -158,7 +158,7 @@ def login():
 # to verify the user identity, and a user specific key cookie to guarantee no one is trying
 # to impersonate someone else logged in who knows the secretkey. Bottle supports cookie expiration.
   response.set_cookie('session', usr, secret=secretkey)
-  return {'status' : 'Login success at ' + str(time()) + 'UNIX time'}
+  return {'status' : 'Login success at ' + str(time()) + ' UNIX time'}
 
 # These three all have similar behaviour, since they have side effects, they just have different 
 # valid command lists.
