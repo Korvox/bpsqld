@@ -123,7 +123,7 @@ def verifyRequest(request, validCmds):
 # This partition makes sure we only ever execute one sql statement at a time. Otherwise any
 # santization of the first statement is pointless because you could just ; DROP TABLE.
       return (False, cmd.partition(';')[0])
-  return (True, {"status", "badCommand : " + cmd})
+  return (True, {"status" : "badCommand : " + cmd})
 
 # Extracted the behavior of queries that modify the db.
 def runmod(request, validCmds):
