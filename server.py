@@ -123,7 +123,7 @@ def verifyRequest(request, validCmds):
 # This partition makes sure we only ever execute one sql statement at a time. Otherwise any
 # santization of the first statement is pointless because you could just ; DROP TABLE.
       return (False, cmd.partition(';')[0])
-  return (True, badCommand)
+  return (True, {"status", "badCommand : " + cmd})
 
 # Extracted the behavior of queries that modify the db.
 def runmod(request, validCmds):
@@ -132,6 +132,7 @@ def runmod(request, validCmds):
     return status[1]
   try:
 # The global namespace cursor is provided with statements at the end of this script.
+# The semicolon is necessary to finish the statement since we split it off before.
     cursor.execute(status[1])
   except psycopg2.Warning as msg:
 # Also declared in with statements is the database.
@@ -190,6 +191,7 @@ def query():
 
 # Documentation says you can use with X as Y syntax with connect and cursor, but in practice
 # they error out with __exit__ failing. Potential bug to be submitted against psycopg.
+# The host / user / password are all provided by herokus postgres backend.
 db = psycopg2.connect(database='datjsbtecref3n', 
   host='ec2-54-243-200-16.compute-1.amazonaws.com', port=5432,
   user='fesbqrrveoiunr', password='C_W31yYcSP2qqPdEPUDmjnXZqh')
