@@ -142,7 +142,7 @@ def runmod(request, validCmds):
     db.rollback()
     return {'error', msg.pgerror}
   db.commit()
-  return {'result' : cursor.fetchmany()}
+  return {'result' : 'Transaction Success'}
 
 @post('/')
 @post('/login')
@@ -187,7 +187,10 @@ def query():
     return {'warning' : str(msg)}
   except psycopg2.Error as msg:
     return {'error', msg.pgerror}
-  return {'result' : cursor.fetchmany()}
+  try:
+    return {'result' : cursor.fetchmany()}
+  except psycopg2.ProgrammingError as msg:
+    return {'error', msg.pgerror}
 
 # Documentation says you can use with X as Y syntax with connect and cursor, but in practice
 # they error out with __exit__ failing. Potential bug to be submitted against psycopg.
@@ -199,8 +202,8 @@ cursor = db.cursor()
 
 # I wish lambdas supported multiple statements.
 def closedb():
-  db.close()
   cursor.close()
+  db.close()
 atexit.register(closedb)
 
 run(server='gunicorn', 
