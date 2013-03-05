@@ -110,25 +110,24 @@ def validUser(usr, pwd):
 # validCmds is the set of sql statements authorized to be run.
 def verifyRequest(request, validCmds):
   if request.get_cookie('session', secret=secretkey) not in users:
-    return (True, badValidate)
+    return (False, badValidate)
   query = request.json
   if query == None:
-    return (True, badJSON)
+    return (False, badJSON)
 # The posted JSON must have the statement as the key : value of cmd : statement.
   cmd = query['cmd']
   if cmd == None:
-    return (True, badQuery)
+    return (False, badQuery)
   for regex in validCmds:
     if regex.match(cmd):
 # This partition makes sure we only ever execute one sql statement at a time. Otherwise any
 # santization of the first statement is pointless because you could just ; DROP TABLE.
-      return (False, cmd.partition(';')[0])
-  return (True, {"status" : "badCommand : " + cmd})
+      return (True, cmd.partition(';')[0])
+  return (False, {"status" : "badCommand : " + cmd})
 
 # Extracted the behavior of queries that modify the db.
 def runmod(request, validCmds):
-  status = verifyRequest(request, queries)
-  if status[0] != False:
+  if not verifyRequest(request, queries):
     return status[1]
   try:
 # The global namespace cursor is provided with statements at the end of this script.
@@ -178,8 +177,7 @@ def remove():
 # This is the exception, where queries don't have side effects.
 @post('/query')
 def query():
-  status = verifyRequest(request, queries)
-  if status[0] != False:
+  if not verifyRequest(request, queries):
     return status
   try:
     cursor.execute(status[1])
