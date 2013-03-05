@@ -129,18 +129,24 @@ def runmod(request, validCmds):
   status = verifyRequest(request, validCmds)
   if not status[0]:
     return status[1]
+  db = psycopg2.connect(database='datjsbtecref3n', 
+    host='ec2-54-243-200-16.compute-1.amazonaws.com', port=5432,
+    user='fesbqrrveoiunr', password='C_W31yYcSP2qqPdEPUDmjnXZqh')
   try:
 # The global namespace cursor is provided with statements at the end of this script.
 # The semicolon is necessary to finish the statement since we split it off before.
-    cursor.execute(status[1])
+    db.cursor().execute(status[1])
   except psycopg2.Warning as msg:
 # Also declared in with statements is the database.
     db.rollback()
+    db.close()
     return {'warning' : str(msg)}
   except psycopg2.Error as msg:
     db.rollback()
+    db.close()
     return {'error', msg.pgerror}
   db.commit()
+  db.close()
   return {'result' : 'Transaction Success'}
 
 @post('/')
@@ -194,16 +200,16 @@ def query():
 # Documentation says you can use with X as Y syntax with connect and cursor, but in practice
 # they error out with __exit__ failing. Potential bug to be submitted against psycopg.
 # The host / user / password are all provided by herokus postgres backend.
-db = psycopg2.connect(database='datjsbtecref3n', 
-  host='ec2-54-243-200-16.compute-1.amazonaws.com', port=5432,
-  user='fesbqrrveoiunr', password='C_W31yYcSP2qqPdEPUDmjnXZqh')
-cursor = db.cursor()
+#db = psycopg2.connect(database='datjsbtecref3n', 
+#  host='ec2-54-243-200-16.compute-1.amazonaws.com', port=5432,
+#  user='fesbqrrveoiunr', password='C_W31yYcSP2qqPdEPUDmjnXZqh')
+#cursor = db.cursor()
 
 # I wish lambdas supported multiple statements.
-def closedb():
-  cursor.close()
-  db.close()
-atexit.register(closedb)
+#def closedb():
+#  cursor.close()
+#  db.close()
+#atexit.register(closedb)
 
 run(server='gunicorn', 
 # These options are all required to set up ssl on a heroku dyno and get correct port handling.
