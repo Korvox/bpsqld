@@ -132,8 +132,9 @@ def runmod(request, validCmds):
 #  db = psycopg2.connect(database='datjsbtecref3n', 
 #    host='ec2-54-243-200-16.compute-1.amazonaws.com', port=5432,
 #    user='fesbqrrveoiunr', password='C_W31yYcSP2qqPdEPUDmjnXZqh')
+  cursor = db.cursor()
   try:
-    db.cursor().execute(status[1])
+    cursor.execute(status[1])
     db.commit()
 # Paranoid safety here, I rollback transactions even if its per-commit and an error means it never
 # finished. I'd rather be safe than sorry.
@@ -143,6 +144,8 @@ def runmod(request, validCmds):
   except psycopg2.Error as msg:
     db.rollback()
     return {'error' : msg.pgerror}
+  finally:
+    cursor.close()
 #  db.close()
   return {'result' : 'Transaction Success'}
 
@@ -188,13 +191,13 @@ def query():
   try:
     cursor.execute(status[1])
     result = cursor.fetchmany()
-  finally:
-    cursor.close()
-#    db.close()
   except psycopg2.Warning as msg:
     return {'warning' : str(msg)}
   except psycopg2.Error as msg:
     return {'error', msg.pgerror}
+  finally:
+    cursor.close()
+#    db.close()
   return {'result' : result}
 
 run(server='gunicorn', 
