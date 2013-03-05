@@ -127,7 +127,8 @@ def verifyRequest(request, validCmds):
 
 # Extracted the behavior of queries that modify the db.
 def runmod(request, validCmds):
-  if not verifyRequest(request, queries):
+  status = verifyRequest(request, queries)
+  if not status[0]:
     return status[1]
   try:
 # The global namespace cursor is provided with statements at the end of this script.
@@ -177,8 +178,9 @@ def remove():
 # This is the exception, where queries don't have side effects.
 @post('/query')
 def query():
-  if not verifyRequest(request, queries):
-    return status
+  status = verifyRequest(request, queries)
+  if not status[0]:
+    return status[1]
   try:
     cursor.execute(status[1])
   except psycopg2.Warning as msg:
