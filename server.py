@@ -42,8 +42,7 @@ users = {
 # and implicitly does the dumps. These dicts are json returns of common errors.
 badValidate = {'status' : 'Invalid Credentials'}
 badJSON = {'status' : 'Invalid JSON'}
-badQuery = {'status' : 'No sql command'}
-badCommand = {'status' : 'Malformed SQL command'}
+noCmd = {'status' : 'No sql command'}
 
 """
  Regex patterns to identify SQL commands passed in. All use re.I to be case insenitive regexes.
@@ -117,8 +116,9 @@ def verifyRequest(request, validCmds):
 # The posted JSON must have the statement as the key : value of cmd : statement.
   cmd = query['cmd']
   if cmd == None:
-    return (False, badQuery)
+    return (False, noCmd)
   for regex in validCmds:
+    print(regex, ' ', cmd)
     if regex.match(cmd):
 # This partition makes sure we only ever execute one sql statement at a time. Otherwise any
 # santization of the first statement is pointless because you could just ; DROP TABLE.
