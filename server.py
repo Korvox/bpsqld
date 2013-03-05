@@ -144,7 +144,7 @@ def runmod(request, validCmds):
   except psycopg2.Error as msg:
     db.rollback()
     db.close()
-    return {'error', msg.pgerror}
+    return {'error' : msg.pgerror}
   db.commit()
   db.close()
   return {'result' : 'Transaction Success'}
