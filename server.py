@@ -129,9 +129,9 @@ def runmod(request, validCmds):
   status = verifyRequest(request, validCmds)
   if not status[0]:
     return status[1]
-  db = psycopg2.connect(database='datjsbtecref3n', 
-    host='ec2-54-243-200-16.compute-1.amazonaws.com', port=5432,
-    user='fesbqrrveoiunr', password='C_W31yYcSP2qqPdEPUDmjnXZqh')
+#  db = psycopg2.connect(database='datjsbtecref3n', 
+#    host='ec2-54-243-200-16.compute-1.amazonaws.com', port=5432,
+#    user='fesbqrrveoiunr', password='C_W31yYcSP2qqPdEPUDmjnXZqh')
   cursor = db.cursor()
   try:
     cursor.execute(status[1])
@@ -146,7 +146,7 @@ def runmod(request, validCmds):
     return {'error' : msg.pgerror}
   finally:
     cursor.close()
-    db.close()
+#    db.close()
   return {'result' : 'Transaction Success'}
 
 @post('/')
@@ -184,9 +184,9 @@ def query():
   status = verifyRequest(request, queries)
   if not status[0]:
     return status[1]
-  db = psycopg2.connect(database='datjsbtecref3n', 
-    host='ec2-54-243-200-16.compute-1.amazonaws.com', port=5432,
-    user='fesbqrrveoiunr', password='C_W31yYcSP2qqPdEPUDmjnXZqh')
+#  db = psycopg2.connect(database='datjsbtecref3n', 
+#    host='ec2-54-243-200-16.compute-1.amazonaws.com', port=5432,
+#    user='fesbqrrveoiunr', password='C_W31yYcSP2qqPdEPUDmjnXZqh')
   cursor = db.cursor()
   try:
     cursor.execute(status[1])
@@ -197,22 +197,22 @@ def query():
     return {'error', msg.pgerror}
   finally:
     cursor.close()
-    db.close()
+#    db.close()
   return {'result' : result}
 
 # Documentation says you can use with X as Y syntax with connect and cursor, but in practice
 # they error out with __exit__ failing. Potential bug to be submitted against psycopg.
 # The host / user / password are all provided by herokus postgres backend.
-#db = psycopg2.connect(database='datjsbtecref3n', 
-#  host='ec2-54-243-200-16.compute-1.amazonaws.com', port=5432,
-#  user='fesbqrrveoiunr', password='C_W31yYcSP2qqPdEPUDmjnXZqh')
+db = psycopg2.connect(database='datjsbtecref3n', 
+  host='ec2-54-243-200-16.compute-1.amazonaws.com', port=5432,
+  user='fesbqrrveoiunr', password='C_W31yYcSP2qqPdEPUDmjnXZqh')
 #cursor = db.cursor()
 
 # I wish lambdas supported multiple statements.
-#def closedb():
+def closedb():
 #  cursor.close()
-#  db.close()
-#atexit.register(closedb)
+  db.close()
+atexit.register(closedb)
 
 run(server='gunicorn', 
 # These options are all required to set up ssl on a heroku dyno and get correct port handling.
