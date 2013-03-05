@@ -118,7 +118,6 @@ def verifyRequest(request, validCmds):
   if cmd == None:
     return (False, noCmd)
   for regex in validCmds:
-    print(regex.pattern, ' ', cmd)
     if regex.match(cmd):
 # This partition makes sure we only ever execute one sql statement at a time. Otherwise any
 # santization of the first statement is pointless because you could just ; DROP TABLE.
@@ -127,7 +126,7 @@ def verifyRequest(request, validCmds):
 
 # Extracted the behavior of queries that modify the db.
 def runmod(request, validCmds):
-  status = verifyRequest(request, queries)
+  status = verifyRequest(request, validCmds)
   if not status[0]:
     return status[1]
   try:
