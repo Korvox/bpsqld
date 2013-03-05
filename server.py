@@ -186,16 +186,29 @@ def query():
   status = verifyRequest(request, queries)
   if not status[0]:
     return status[1]
+  db = psycopg2.connect(database='datjsbtecref3n', 
+    host='ec2-54-243-200-16.compute-1.amazonaws.com', port=5432,
+    user='fesbqrrveoiunr', password='C_W31yYcSP2qqPdEPUDmjnXZqh')
   try:
-    cursor.execute(status[1])
+    db.cursor().execute(status[1])
   except psycopg2.Warning as msg:
+    db.close()
     return {'warning' : str(msg)}
   except psycopg2.Error as msg:
+    db.close()
     return {'error', msg.pgerror}
+  db.close()
   try:
     return {'result' : cursor.fetchmany()}
   except psycopg2.ProgrammingError as msg:
     return {'error', msg.pgerror}
+
+run(server='gunicorn', 
+# These options are all required to set up ssl on a heroku dyno and get correct port handling.
+  host='0.0.0.0', port=int(environ.get('PORT', 9876)), workers=cpu_count(),
+  forwarded_allow_ips='*',
+  secure_scheme_headers={'X-FORWARDED-PROTOCOL': 'ssl', 'X-FORWARDED-PROTO': 'https', 'X-FORWARDED-SSL': 'on'}
+)
 
 # Documentation says you can use with X as Y syntax with connect and cursor, but in practice
 # they error out with __exit__ failing. Potential bug to be submitted against psycopg.
@@ -210,10 +223,3 @@ def query():
 #  cursor.close()
 #  db.close()
 #atexit.register(closedb)
-
-run(server='gunicorn', 
-# These options are all required to set up ssl on a heroku dyno and get correct port handling.
-  host='0.0.0.0', port=int(environ.get('PORT', 9876)), workers=cpu_count(),
-  forwarded_allow_ips='*',
-  secure_scheme_headers={'X-FORWARDED-PROTOCOL': 'ssl', 'X-FORWARDED-PROTO': 'https', 'X-FORWARDED-SSL': 'on'}
-)
