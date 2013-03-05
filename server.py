@@ -129,24 +129,21 @@ def runmod(request, validCmds):
   status = verifyRequest(request, validCmds)
   if not status[0]:
     return status[1]
-  db = psycopg2.connect(database='datjsbtecref3n', 
-    host='ec2-54-243-200-16.compute-1.amazonaws.com', port=5432,
-    user='fesbqrrveoiunr', password='C_W31yYcSP2qqPdEPUDmjnXZqh')
+#  db = psycopg2.connect(database='datjsbtecref3n', 
+#    host='ec2-54-243-200-16.compute-1.amazonaws.com', port=5432,
+#    user='fesbqrrveoiunr', password='C_W31yYcSP2qqPdEPUDmjnXZqh')
   try:
-# The global namespace cursor is provided with statements at the end of this script.
-# The semicolon is necessary to finish the statement since we split it off before.
     db.cursor().execute(status[1])
+    db.commit()
+# Paranoid safety here, I rollback transactions even if its per-commit and an error means it never
+# finished. I'd rather be safe than sorry.
   except psycopg2.Warning as msg:
-# Also declared in with statements is the database.
     db.rollback()
-    db.close()
     return {'warning' : str(msg)}
   except psycopg2.Error as msg:
     db.rollback()
-    db.close()
     return {'error' : msg.pgerror}
-  db.commit()
-  db.close()
+#  db.close()
   return {'result' : 'Transaction Success'}
 
 @post('/')
@@ -160,9 +157,7 @@ def login():
   pwd = query['pwd']
   if not validUser(usr, pwd):
     return badValidate
-# In practice, you would want expiring cookies, and two cookies per user - a session cookie
-# to verify the user identity, and a user specific key cookie to guarantee no one is trying
-# to impersonate someone else logged in who knows the secretkey. Bottle supports cookie expiration.
+# In practice, you would want expiring cookies. I figure skip the hassle for a demo.
   response.set_cookie('session', usr, secret=secretkey)
   return {'status' : 'Login success at ' + str(time()) + ' UNIX time'}
 
@@ -180,28 +175,27 @@ def add():
 def remove():
   return runmod(request, dangers)
 
-# This is the exception, where queries don't have side effects.
+# This is the exception, where queries don't have side effects, so no commits needed.
 @post('/query')
 def query():
   status = verifyRequest(request, queries)
   if not status[0]:
     return status[1]
-  db = psycopg2.connect(database='datjsbtecref3n', 
-    host='ec2-54-243-200-16.compute-1.amazonaws.com', port=5432,
-    user='fesbqrrveoiunr', password='C_W31yYcSP2qqPdEPUDmjnXZqh')
+  #db = psycopg2.connect(database='datjsbtecref3n', 
+  #  host='ec2-54-243-200-16.compute-1.amazonaws.com', port=5432,
+  #  user='fesbqrrveoiunr', password='C_W31yYcSP2qqPdEPUDmjnXZqh')
+  cursor = db.cursor()
   try:
-    db.cursor().execute(status[1])
+    cursor.execute(status[1])
+    result = cursor.fetchmany()
+  finally:
+    cursor.close()
+#    db.close()
   except psycopg2.Warning as msg:
-    db.close()
     return {'warning' : str(msg)}
   except psycopg2.Error as msg:
-    db.close()
     return {'error', msg.pgerror}
-  db.close()
-  try:
-    return {'result' : cursor.fetchmany()}
-  except psycopg2.ProgrammingError as msg:
-    return {'error', msg.pgerror}
+  return {'result' : result}
 
 run(server='gunicorn', 
 # These options are all required to set up ssl on a heroku dyno and get correct port handling.
@@ -213,13 +207,13 @@ run(server='gunicorn',
 # Documentation says you can use with X as Y syntax with connect and cursor, but in practice
 # they error out with __exit__ failing. Potential bug to be submitted against psycopg.
 # The host / user / password are all provided by herokus postgres backend.
-#db = psycopg2.connect(database='datjsbtecref3n', 
-#  host='ec2-54-243-200-16.compute-1.amazonaws.com', port=5432,
-#  user='fesbqrrveoiunr', password='C_W31yYcSP2qqPdEPUDmjnXZqh')
+db = psycopg2.connect(database='datjsbtecref3n', 
+  host='ec2-54-243-200-16.compute-1.amazonaws.com', port=5432,
+  user='fesbqrrveoiunr', password='C_W31yYcSP2qqPdEPUDmjnXZqh')
 #cursor = db.cursor()
 
 # I wish lambdas supported multiple statements.
-#def closedb():
+def closedb():
 #  cursor.close()
-#  db.close()
-#atexit.register(closedb)
+  db.close()
+atexit.register(closedb)
